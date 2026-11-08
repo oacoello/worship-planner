@@ -1,0 +1,61 @@
+[package]
+name = "granco-planner"
+version = "1.0.0"
+edition = "2021"
+authors = ["Oscar Coello"]
+description = "Granco Planner - Native Rust Worship Service & Setlist Planner"
+license = "MIT"
+default-run = "granco-planner"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "x11",
+    "wayland",
+] }
+egui = "0.31"
+egui_extras = { version = "0.31", features = ["all_loaders", "image"] }
+rusqlite = { version = "0.34", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "ico"] }
+base64 = "0.22"
+rfd = "0.15"
+directories = "6.0"
+open = "5.3"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[package.metadata.deb]
+name = "granco-planner"
+maintainer = "Oscar Coello <oacoello@users.noreply.github.com>"
+copyright = "2026, Oscar Coello. All rights reserved."
+depends = "$auto"
+section = "sound"
+priority = "optional"
+assets = [
+    ["target/release/granco-planner", "usr/bin/", "755"],
+    ["packaging/linux/granco-planner.desktop", "usr/share/applications/", "644"],
+    ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/granco-planner.png", "644"],
+]
+extended-description = """
+Granco Planner is a native Rust desktop application for planning worship services,
+sermon series, musical setlists, song arrangements, and song rotation analytics.
+"""
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/granco-planner", dest = "/usr/bin/granco-planner", mode = "0755" },
+    { source = "packaging/linux/granco-planner.desktop", dest = "/usr/share/applications/granco-planner.desktop", mode = "0644" },
+    { source = "assets/icon.png", dest = "/usr/share/icons/hicolor/512x512/apps/granco-planner.png", mode = "0644" },
+]

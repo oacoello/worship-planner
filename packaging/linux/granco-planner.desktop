@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Granco Planner
+Comment=Planificador de servicios de alabanza, series de sermones y cancionero
+Comment[en]=Worship service, sermon series, and setlist planner
+Exec=/usr/bin/granco-planner
+Icon=granco-planner
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Office;
+StartupWMClass=Granco Planner
+Keywords=worship;planner;setlist;church;music;
