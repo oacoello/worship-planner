@@ -83,7 +83,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           Copy-Item "target\x86_64-pc-windows-msvc\release\granco-planner.exe" "release\Granco-Planner-1.0.0-portable-x64.exe"
-          makensis packaging\windows\installer.nsi
+          $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $makensis)) {
+            choco install nsis -y --no-progress
+          }
+          & $makensis "packaging\windows\installer.nsi"
+          if ($LASTEXITCODE -ne 0) {
+            throw "makensis failed with exit code $LASTEXITCODE"
+          }
 
       - name: Upload Windows Installer Artifacts
         uses: actions/upload-artifact@v4

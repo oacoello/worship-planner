@@ -8,8 +8,8 @@ InstallDirRegKey HKLM "Software\GrancoPlanner" "Install_Dir"
 RequestExecutionLevel admin
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "..\..\assets\icon.ico"
-!define MUI_UNICON "..\..\assets\icon.ico"
+!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
+!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
 ; Pages
 !insertmacro MUI_PAGE_WELCOME
@@ -36,7 +36,7 @@ Section "Granco Planner" SecMain
   ; Write Uninstaller keys for Add/Remove Programs
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "DisplayName" "Granco Planner"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "DisplayIcon" '"$INSTDIR\icon.ico"'
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "DisplayIcon" '"$INSTDIR\granco-planner.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "Publisher" "Oscar Coello"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "DisplayVersion" "1.0.0"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner" "NoModify" 1
@@ -45,9 +45,9 @@ Section "Granco Planner" SecMain
 
   ; Create Start Menu & Desktop Shortcuts
   CreateDirectory "$SMPROGRAMS\Granco Planner"
-  CreateShortCut "$SMPROGRAMS\Granco Planner\Granco Planner.lnk" "$INSTDIR\granco-planner.exe" "" "$INSTDIR\icon.ico" 0
+  CreateShortCut "$SMPROGRAMS\Granco Planner\Granco Planner.lnk" "$INSTDIR\granco-planner.exe" "" "$INSTDIR\granco-planner.exe" 0
   CreateShortCut "$SMPROGRAMS\Granco Planner\Uninstall.lnk" "$INSTDIR\uninstall.exe"
-  CreateShortCut "$DESKTOP\Granco Planner.lnk" "$INSTDIR\granco-planner.exe" "" "$INSTDIR\icon.ico" 0
+  CreateShortCut "$DESKTOP\Granco Planner.lnk" "$INSTDIR\granco-planner.exe" "" "$INSTDIR\granco-planner.exe" 0
 SectionEnd
 
 Section "Uninstall"
@@ -63,5 +63,5 @@ Section "Uninstall"
   RMDir "$INSTDIR"
 
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner"
-  DeleteRegKey HKLM "Software\GrancoPlanner"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\GrancoPlanner"
 SectionEnd
