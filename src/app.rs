@@ -4,6 +4,7 @@ use crate::export::{
     extract_ambient_tint, generate_printable_html, LOGO_DARK_BYTES, LOGO_LIGHT_BYTES,
 };
 use crate::i18n::I18n;
+use crate::icons::{Icon, IconCache};
 use crate::models::{
     AppSettings, Arrangement, ItemType, Language, SermonSeries, ServiceItem, ServicePlan, Song,
     ThemeMode, DEFAULT_KEYS,
@@ -201,6 +202,7 @@ pub struct GrancoPlannerApp {
     status_toast: Option<(String, f64)>,
 
     // Texture caches
+    icons: IconCache,
     logo_dark_tex: Option<TextureHandle>,
     logo_light_tex: Option<TextureHandle>,
     artwork_textures: HashMap<String, TextureHandle>,
@@ -248,6 +250,7 @@ impl GrancoPlannerApp {
             editing_vocalist_text: String::new(),
             pending_screenshot_path: None,
             status_toast: None,
+            icons: IconCache::new(),
             logo_dark_tex: None,
             logo_light_tex: None,
             artwork_textures: HashMap::new(),
@@ -513,14 +516,11 @@ impl GrancoPlannerApp {
             )
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    // App Header
+                    // App Header with Streamline Plump Color logo
                     ui.horizontal(|ui| {
                         ui.add_space(4.0);
-                        ui.label(
-                            RichText::new("⛪")
-                                .size(20.0)
-                                .color(Color32::from_rgb(56, 189, 248)),
-                        );
+                        self.icons.draw(ctx, ui, Icon::AppLogo, 24.0);
+                        ui.add_space(4.0);
                         ui.label(
                             RichText::new(i18n.t("appTitle"))
                                 .size(17.0)
@@ -530,11 +530,11 @@ impl GrancoPlannerApp {
                     ui.add_space(20.0);
 
                     let nav_items = [
-                        (ActiveView::Services, "📅", i18n.t("services")),
-                        (ActiveView::Calendar, "🗓", i18n.t("calendar")),
-                        (ActiveView::Series, "🖼", i18n.t("series")),
-                        (ActiveView::SongBank, "🎵", i18n.t("songBank")),
-                        (ActiveView::Stats, "📊", i18n.t("stats")),
+                        (ActiveView::Services, Icon::Services, i18n.t("services")),
+                        (ActiveView::Calendar, Icon::Calendar, i18n.t("calendar")),
+                        (ActiveView::Series, Icon::Series, i18n.t("series")),
+                        (ActiveView::SongBank, Icon::SongBank, i18n.t("songBank")),
+                        (ActiveView::Stats, Icon::Analytics, i18n.t("stats")),
                     ];
 
                     let effective_selected = if self.current_view == ActiveView::Builder {
@@ -545,7 +545,10 @@ impl GrancoPlannerApp {
 
                     for (view, icon, label) in nav_items {
                         let is_selected = effective_selected == view;
-                        if Self::sidebar_tab_button(ui, icon, label, is_selected, is_dark) {
+                        if self
+                            .icons
+                            .sidebar_tab(ctx, ui, icon, label, is_selected, is_dark)
+                        {
                             self.current_view = view;
                             if view != ActiveView::Builder {
                                 self.active_service_id = None;
@@ -562,9 +565,10 @@ impl GrancoPlannerApp {
                     ui.separator();
                     ui.add_space(4.0);
                     let settings_selected = self.current_view == ActiveView::Settings;
-                    if Self::sidebar_tab_button(
+                    if self.icons.sidebar_tab(
+                        ctx,
                         ui,
-                        "⚙",
+                        Icon::Settings,
                         i18n.t("settings"),
                         settings_selected,
                         is_dark,
@@ -574,47 +578,6 @@ impl GrancoPlannerApp {
                     }
                 });
             });
-    }
-
-    fn sidebar_tab_button(
-        ui: &mut Ui,
-        icon: &str,
-        label: &str,
-        selected: bool,
-        is_dark: bool,
-    ) -> bool {
-        let fill = if selected {
-            if is_dark {
-                Color32::from_rgb(0, 102, 180)
-            } else {
-                Color32::from_rgb(224, 242, 254)
-            }
-        } else {
-            Color32::TRANSPARENT
-        };
-        let text_color = if selected {
-            if is_dark {
-                Color32::WHITE
-            } else {
-                Color32::from_rgb(3, 105, 161)
-            }
-        } else if is_dark {
-            Color32::from_rgb(212, 212, 216)
-        } else {
-            Color32::from_rgb(51, 65, 85)
-        };
-
-        let btn = egui::Button::new(
-            RichText::new(format!("{}   {}", icon, label))
-                .size(14.0)
-                .color(text_color)
-                .strong(),
-        )
-        .fill(fill)
-        .corner_radius(CornerRadius::same(6))
-        .min_size(Vec2::new(ui.available_width(), 36.0));
-
-        ui.add(btn).clicked()
     }
 
     // ==========================================
@@ -635,20 +598,23 @@ impl GrancoPlannerApp {
                         ui.label(
                             RichText::new(i18n.t("servicePlansDesc"))
                                 .size(14.0)
-                                .color( Color32::GRAY),
+                                .color(Color32::GRAY),
                         );
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.add_space(24.0);
-                        let new_btn = egui::Button::new(
-                            RichText::new(format!("➕  {}", i18n.t("newService")))
-                                .color(Color32::WHITE)
-                                .strong(),
-                        )
-                        .fill(Color32::from_rgb(0, 120, 212))
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(140.0, 36.0));
-                        if ui.add(new_btn).clicked() {
+                        if self
+                            .icons
+                            .button(
+                                ctx,
+                                ui,
+                                Icon::Add,
+                                i18n.t("newService"),
+                                true,
+                                Vec2::new(145.0, 36.0),
+                            )
+                            .clicked()
+                        {
                             self.open_new_service_modal(None);
                         }
                     });
@@ -850,15 +816,14 @@ impl GrancoPlannerApp {
                             Color32::WHITE,
                         );
                     } else {
-                        ui.painter().text(
-                            rect.center() - Vec2::new(0.0, 10.0),
-                            egui::Align2::CENTER_CENTER,
-                            "📋",
-                            FontId::proportional(28.0),
-                            Color32::GRAY,
+                        let icon_rect = egui::Rect::from_center_size(
+                            rect.center() - Vec2::new(0.0, 12.0),
+                            Vec2::splat(36.0),
                         );
+                        self.icons
+                            .paint_at(ctx, ui, Icon::EmptyClipboard, icon_rect, Color32::WHITE);
                         ui.painter().text(
-                            rect.center() + Vec2::new(0.0, 18.0),
+                            rect.center() + Vec2::new(0.0, 22.0),
                             egui::Align2::CENTER_CENTER,
                             i18n.t("standaloneWorshipService"),
                             FontId::proportional(13.0),
@@ -899,8 +864,12 @@ impl GrancoPlannerApp {
                             ui.add_space(6.0);
                             let formatted_dt =
                                 i18n.format_card_date_time(&service.date, &service.time);
-                            ui.label(
-                                RichText::new(format!("📅  {}", formatted_dt))
+                            self.icons.label_with_icon(
+                                ctx,
+                                ui,
+                                Icon::CalendarCheck,
+                                16.0,
+                                RichText::new(formatted_dt)
                                     .size(13.0)
                                     .color(Color32::GRAY),
                             );
@@ -914,23 +883,46 @@ impl GrancoPlannerApp {
                         .show(ui, |ui| {
                             ui.set_width(296.0);
                             ui.horizontal(|ui| {
-                                if ui
-                                    .button(format!("✏ {}", i18n.t("editPlan")))
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::Edit,
+                                        i18n.t("editPlan"),
+                                        false,
+                                        Vec2::new(96.0, 30.0),
+                                    )
                                     .clicked()
                                 {
                                     edit_svc = Some(service.clone());
                                 }
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui
-                                        .add(egui::Button::new(
-                                            RichText::new(format!("🗑 {}", i18n.t("delete")))
-                                                .color(Color32::from_rgb(239, 68, 68)),
-                                        ))
+                                    if self
+                                        .icons
+                                        .button_danger(
+                                            ctx,
+                                            ui,
+                                            Icon::Delete,
+                                            i18n.t("delete"),
+                                            Vec2::new(82.0, 30.0),
+                                        )
                                         .clicked()
                                     {
                                         delete_id = Some(service.id.clone());
                                     }
-                                    if ui.button("▶ Open").clicked() {
+                                    if self
+                                        .icons
+                                        .button(
+                                            ctx,
+                                            ui,
+                                            Icon::Play,
+                                            "Open",
+                                            false,
+                                            Vec2::new(76.0, 30.0),
+                                        )
+                                        .clicked()
+                                    {
                                         open_id = Some(service.id.clone());
                                     }
                                 });
@@ -966,15 +958,18 @@ impl GrancoPlannerApp {
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.add_space(24.0);
-                        let new_btn = egui::Button::new(
-                            RichText::new(format!("➕  {}", i18n.t("newService")))
-                                .color(Color32::WHITE)
-                                .strong(),
-                        )
-                        .fill(Color32::from_rgb(0, 120, 212))
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(130.0, 34.0));
-                        if ui.add(new_btn).clicked() {
+                        if self
+                            .icons
+                            .button(
+                                ctx,
+                                ui,
+                                Icon::Add,
+                                i18n.t("newService"),
+                                true,
+                                Vec2::new(135.0, 34.0),
+                            )
+                            .clicked()
+                        {
                             self.open_new_service_modal(None);
                         }
 
@@ -984,7 +979,11 @@ impl GrancoPlannerApp {
                             self.calendar_month = now.month();
                         }
 
-                        if ui.button("▶").clicked() {
+                        if self
+                            .icons
+                            .icon_only_button(ctx, ui, Icon::ArrowRight, 28.0, true)
+                            .clicked()
+                        {
                             if self.calendar_month == 12 {
                                 self.calendar_month = 1;
                                 self.calendar_year += 1;
@@ -1003,7 +1002,11 @@ impl GrancoPlannerApp {
                             egui::Label::new(RichText::new(month_title).size(18.0).strong()),
                         );
 
-                        if ui.button("◀").clicked() {
+                        if self
+                            .icons
+                            .icon_only_button(ctx, ui, Icon::Back, 28.0, true)
+                            .clicked()
+                        {
                             if self.calendar_month == 1 {
                                 self.calendar_month = 12;
                                 self.calendar_year -= 1;
@@ -1178,8 +1181,15 @@ impl GrancoPlannerApp {
                                                                     Align::Center,
                                                                 ),
                                                                 |ui| {
-                                                                    if ui
-                                                                        .small_button("＋")
+                                                                    if self
+                                                                        .icons
+                                                                        .icon_only_button(
+                                                                            ctx,
+                                                                            ui,
+                                                                            Icon::Add,
+                                                                            20.0,
+                                                                            true,
+                                                                        )
                                                                         .on_hover_text(i18n.t(
                                                                             "addServiceForDay",
                                                                         ))
@@ -1254,13 +1264,14 @@ impl GrancoPlannerApp {
                                                                                 ),
                                                                             );
                                                                         }
-                                                                        ui.label(
-                                                                            RichText::new(format!(
-                                                                                "🕒 {}",
-                                                                                svc.time
-                                                                            ))
-                                                                            .size(10.0)
-                                                                            .color(Color32::GRAY),
+                                                                        self.icons.label_with_icon(
+                                                                            ctx,
+                                                                            ui,
+                                                                            Icon::Clock,
+                                                                            12.0,
+                                                                            RichText::new(&svc.time)
+                                                                                .size(10.0)
+                                                                                .color(Color32::GRAY),
                                                                         );
                                                                     });
                                                                 })
@@ -1318,15 +1329,18 @@ impl GrancoPlannerApp {
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.add_space(24.0);
-                        let btn = egui::Button::new(
-                            RichText::new(format!("➕  {}", i18n.t("newSeries")))
-                                .color(Color32::WHITE)
-                                .strong(),
-                        )
-                        .fill(Color32::from_rgb(0, 120, 212))
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(130.0, 36.0));
-                        if ui.add(btn).clicked() {
+                        if self
+                            .icons
+                            .button(
+                                ctx,
+                                ui,
+                                Icon::Add,
+                                i18n.t("newSeries"),
+                                true,
+                                Vec2::new(135.0, 36.0),
+                            )
+                            .clicked()
+                        {
                             self.series_form = SeriesFormState::default();
                             self.show_series_modal = true;
                         }
@@ -1401,15 +1415,19 @@ impl GrancoPlannerApp {
                                                 Color32::WHITE,
                                             );
                                         } else {
-                                            ui.painter().text(
-                                                rect.center() - Vec2::new(0.0, 8.0),
-                                                egui::Align2::CENTER_CENTER,
-                                                "🖼",
-                                                FontId::proportional(28.0),
-                                                Color32::GRAY,
+                                            let icon_rect = egui::Rect::from_center_size(
+                                                rect.center() - Vec2::new(0.0, 10.0),
+                                                Vec2::splat(36.0),
+                                            );
+                                            self.icons.paint_at(
+                                                ctx,
+                                                ui,
+                                                Icon::LandscapeView,
+                                                icon_rect,
+                                                Color32::WHITE,
                                             );
                                             ui.painter().text(
-                                                rect.center() + Vec2::new(0.0, 18.0),
+                                                rect.center() + Vec2::new(0.0, 22.0),
                                                 egui::Align2::CENTER_CENTER,
                                                 i18n.t("noArtworkUploaded"),
                                                 FontId::proportional(12.5),
@@ -1447,8 +1465,16 @@ impl GrancoPlannerApp {
                                             .show(ui, |ui| {
                                                 ui.set_width(266.0);
                                                 ui.horizontal(|ui| {
-                                                    if ui
-                                                        .button(format!("✏ {}", i18n.t("editPlan")))
+                                                    if self
+                                                        .icons
+                                                        .button(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::Edit,
+                                                            i18n.t("editPlan"),
+                                                            false,
+                                                            Vec2::new(96.0, 30.0),
+                                                        )
                                                         .clicked()
                                                     {
                                                         edit_series = Some(series.clone());
@@ -1456,16 +1482,15 @@ impl GrancoPlannerApp {
                                                     ui.with_layout(
                                                         Layout::right_to_left(Align::Center),
                                                         |ui| {
-                                                            if ui
-                                                                .add(egui::Button::new(
-                                                                    RichText::new(format!(
-                                                                        "🗑 {}",
-                                                                        i18n.t("delete")
-                                                                    ))
-                                                                    .color(Color32::from_rgb(
-                                                                        239, 68, 68,
-                                                                    )),
-                                                                ))
+                                                            if self
+                                                                .icons
+                                                                .button_danger(
+                                                                    ctx,
+                                                                    ui,
+                                                                    Icon::Delete,
+                                                                    i18n.t("delete"),
+                                                                    Vec2::new(82.0, 30.0),
+                                                                )
                                                                 .clicked()
                                                             {
                                                                 delete_series_id =
@@ -1540,11 +1565,15 @@ impl GrancoPlannerApp {
                     .show(ui, |ui| {
                         // Top Navigation & Export Bar
                         ui.horizontal(|ui| {
-                            if ui
+                            if self
+                                .icons
                                 .button(
-                                    RichText::new(format!("⬅  {}", i18n.t("backToServices")))
-                                        .size(13.5)
-                                        .strong(),
+                                    ctx,
+                                    ui,
+                                    Icon::Back,
+                                    i18n.t("backToServices"),
+                                    false,
+                                    Vec2::new(140.0, 32.0),
                                 )
                                 .clicked()
                             {
@@ -1553,15 +1582,18 @@ impl GrancoPlannerApp {
                             }
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                let png_btn = egui::Button::new(
-                                    RichText::new(format!("📷  {}", i18n.t("savePngScreenshot")))
-                                        .color(Color32::WHITE)
-                                        .strong(),
-                                )
-                                .fill(Color32::from_rgb(0, 120, 212))
-                                .corner_radius(CornerRadius::same(6));
-
-                                if ui.add(png_btn).clicked() {
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::Camera,
+                                        i18n.t("savePngScreenshot"),
+                                        true,
+                                        Vec2::new(165.0, 32.0),
+                                    )
+                                    .clicked()
+                                {
                                     let default_name = format!(
                                         "{}-{}.png",
                                         service.title.replace(' ', "-"),
@@ -1579,8 +1611,16 @@ impl GrancoPlannerApp {
                                     }
                                 }
 
-                                if ui
-                                    .button(format!("🖨  {}", i18n.t("printRunSheet")))
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::Print,
+                                        i18n.t("printRunSheet"),
+                                        false,
+                                        Vec2::new(145.0, 32.0),
+                                    )
                                     .clicked()
                                 {
                                     let html = generate_printable_html(
@@ -1597,8 +1637,16 @@ impl GrancoPlannerApp {
                                     }
                                 }
 
-                                if ui
-                                    .button(format!("✏  {}", i18n.t("editPlanDetails")))
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::Edit,
+                                        i18n.t("editPlanDetails"),
+                                        false,
+                                        Vec2::new(140.0, 32.0),
+                                    )
                                     .clicked()
                                 {
                                     self.open_edit_service_modal(&service);
@@ -1628,19 +1676,35 @@ impl GrancoPlannerApp {
                             .show(ui, |ui| {
                                 ui.horizontal_wrapped(|ui| {
                                     let buttons = [
-                                        (ItemType::Song, "🎵", i18n.t("addSong")),
-                                        (ItemType::Conference, "🎤", i18n.t("addConference")),
-                                        (ItemType::Video, "▶", i18n.t("addVideo")),
-                                        (ItemType::Loop, "↻", i18n.t("addLoop")),
-                                        (ItemType::Announcements, "📢", i18n.t("addAnnouncements")),
-                                        (ItemType::Countdown, "⏱", i18n.t("addCountdown")),
+                                        (ItemType::Song, Icon::Song, i18n.t("addSong")),
+                                        (
+                                            ItemType::Conference,
+                                            Icon::Conference,
+                                            i18n.t("addConference"),
+                                        ),
+                                        (ItemType::Video, Icon::Video, i18n.t("addVideo")),
+                                        (ItemType::Loop, Icon::Loop, i18n.t("addLoop")),
+                                        (
+                                            ItemType::Announcements,
+                                            Icon::Announcements,
+                                            i18n.t("addAnnouncements"),
+                                        ),
+                                        (
+                                            ItemType::Countdown,
+                                            Icon::Countdown,
+                                            i18n.t("addCountdown"),
+                                        ),
                                     ];
                                     for (itype, icon, label) in buttons {
-                                        if ui
+                                        if self
+                                            .icons
                                             .button(
-                                                RichText::new(format!("{}  {}", icon, label))
-                                                    .size(13.0)
-                                                    .strong(),
+                                                ctx,
+                                                ui,
+                                                icon,
+                                                label,
+                                                false,
+                                                Vec2::new(125.0, 32.0),
                                             )
                                             .clicked()
                                         {
@@ -1727,8 +1791,15 @@ impl GrancoPlannerApp {
                                                                 .size(24.0)
                                                                 .strong(),
                                                         );
-                                                        if ui
-                                                            .small_button("✏")
+                                                        if self
+                                                            .icons
+                                                            .icon_only_button(
+                                                                ctx,
+                                                                ui,
+                                                                Icon::Edit,
+                                                                24.0,
+                                                                true,
+                                                            )
                                                             .on_hover_text(
                                                                 i18n.t("editPlanDetails"),
                                                             )
@@ -1774,20 +1845,25 @@ impl GrancoPlannerApp {
 
                                                     ui.add_space(4.0);
                                                     ui.horizontal_wrapped(|ui| {
-                                                        ui.label(
-                                                            RichText::new(format!(
-                                                                "📅 {}",
-                                                                i18n.format_long_date(
-                                                                    &service.date
-                                                                )
+                                                        self.icons.label_with_icon(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::CalendarCheck,
+                                                            16.0,
+                                                            RichText::new(i18n.format_long_date(
+                                                                &service.date,
                                                             ))
                                                             .size(13.0)
                                                             .color(Color32::GRAY),
                                                         );
                                                         ui.add_space(12.0);
-                                                        ui.label(
+                                                        self.icons.label_with_icon(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::Clock,
+                                                            16.0,
                                                             RichText::new(format!(
-                                                                "🕒 {}: {}",
+                                                                "{}: {}",
                                                                 i18n.t("start"),
                                                                 I18n::format_naive_time_12h(
                                                                     start_naive
@@ -1796,9 +1872,13 @@ impl GrancoPlannerApp {
                                                             .size(13.0),
                                                         );
                                                         ui.add_space(12.0);
-                                                        ui.label(
+                                                        self.icons.label_with_icon(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::Countdown,
+                                                            16.0,
                                                             RichText::new(format!(
-                                                                "⏱ {}: {} ({}: {})",
+                                                                "{}: {} ({}: {})",
                                                                 i18n.t("total"),
                                                                 total_formatted,
                                                                 i18n.t("estEnd"),
@@ -1963,13 +2043,14 @@ impl GrancoPlannerApp {
                                                                 Vec2::new(52.0, 24.0),
                                                                 |ui| {
                                                                     ui.horizontal(|ui| {
-                                                                        if ui
-                                                                            .add_enabled(
+                                                                        if self
+                                                                            .icons
+                                                                            .icon_only_button(
+                                                                                ctx,
+                                                                                ui,
+                                                                                Icon::ArrowUp,
+                                                                                22.0,
                                                                                 idx > 0,
-                                                                                egui::Button::new(
-                                                                                    "⬆",
-                                                                                )
-                                                                                .small(),
                                                                             )
                                                                             .clicked()
                                                                         {
@@ -1978,13 +2059,14 @@ impl GrancoPlannerApp {
                                                                                 idx - 1,
                                                                             ));
                                                                         }
-                                                                        if ui
-                                                                            .add_enabled(
+                                                                        if self
+                                                                            .icons
+                                                                            .icon_only_button(
+                                                                                ctx,
+                                                                                ui,
+                                                                                Icon::ArrowDown,
+                                                                                22.0,
                                                                                 idx + 1 < count,
-                                                                                egui::Button::new(
-                                                                                    "⬇",
-                                                                                )
-                                                                                .small(),
                                                                             )
                                                                             .clicked()
                                                                         {
@@ -2023,17 +2105,17 @@ impl GrancoPlannerApp {
                                                                 ),
                                                             );
 
-                                                            // 4. Type Icon
-                                                            ui.add_sized(
-                                                                [30.0, 24.0],
-                                                                egui::Label::new(
-                                                                    RichText::new(
-                                                                        item.item_type
-                                                                            .icon_symbol(),
-                                                                    )
-                                                                    .size(16.0)
-                                                                    .color(accent_col),
-                                                                ),
+                                                            // 4. Type Icon (Streamline Plump Color)
+                                                            ui.allocate_ui(
+                                                                Vec2::new(30.0, 24.0),
+                                                                |ui| {
+                                                                    self.icons.draw(
+                                                                        ctx,
+                                                                        ui,
+                                                                        item.item_type.icon(),
+                                                                        22.0,
+                                                                    );
+                                                                },
                                                             );
 
                                                             // 5. Title & Key / Arrangement Badges
@@ -2112,8 +2194,15 @@ impl GrancoPlannerApp {
                                                                             .italics()
                                                                             .size(13.0),
                                                                         );
-                                                                        if ui
-                                                                            .small_button("✏")
+                                                                        if self
+                                                                            .icons
+                                                                            .icon_only_button(
+                                                                                ctx,
+                                                                                ui,
+                                                                                Icon::Edit,
+                                                                                20.0,
+                                                                                true,
+                                                                            )
                                                                             .on_hover_text(i18n.t(
                                                                                 "saveNotes",
                                                                             ))
@@ -2151,8 +2240,15 @@ impl GrancoPlannerApp {
                                                                             .strong()
                                                                             .size(13.0),
                                                                         );
-                                                                        if ui
-                                                                            .small_button("✏")
+                                                                        if self
+                                                                            .icons
+                                                                            .icon_only_button(
+                                                                                ctx,
+                                                                                ui,
+                                                                                Icon::Edit,
+                                                                                20.0,
+                                                                                true,
+                                                                            )
                                                                             .on_hover_text(i18n.t(
                                                                                 "mainVocalistLead",
                                                                             ))
@@ -2178,19 +2274,17 @@ impl GrancoPlannerApp {
                                                                     Align::Center,
                                                                 ),
                                                                 |ui| {
-                                                                    if ui
-                                                                        .add(
-                                                                            egui::Button::new(
-                                                                                RichText::new("🗑")
-                                                                                    .color(
-                                                                                        Color32::from_rgb(
-                                                                                            239,
-                                                                                            68,
-                                                                                            68,
-                                                                                        ),
-                                                                                    ),
-                                                                            )
-                                                                            .small(),
+                                                                    if self
+                                                                        .icons
+                                                                        .icon_only_button(
+                                                                            ctx,
+                                                                            ui,
+                                                                            Icon::Delete,
+                                                                            22.0,
+                                                                            true,
+                                                                        )
+                                                                        .on_hover_text(
+                                                                            i18n.t("delete"),
                                                                         )
                                                                         .clicked()
                                                                     {
@@ -2407,15 +2501,18 @@ impl GrancoPlannerApp {
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.add_space(24.0);
-                        let btn = egui::Button::new(
-                            RichText::new(format!("➕  {}", i18n.t("newSong")))
-                                .color(Color32::WHITE)
-                                .strong(),
-                        )
-                        .fill(Color32::from_rgb(0, 120, 212))
-                        .corner_radius(CornerRadius::same(6))
-                        .min_size(Vec2::new(130.0, 36.0));
-                        if ui.add(btn).clicked() {
+                        if self
+                            .icons
+                            .button(
+                                ctx,
+                                ui,
+                                Icon::Add,
+                                i18n.t("newSong"),
+                                true,
+                                Vec2::new(135.0, 36.0),
+                            )
+                            .clicked()
+                        {
                             self.new_song_form = NewSongFormState::default();
                             self.show_new_song_modal = true;
                         }
@@ -2425,7 +2522,7 @@ impl GrancoPlannerApp {
                 ui.add_space(18.0);
                 ui.horizontal(|ui| {
                     ui.add_space(24.0);
-                    ui.label("🔍");
+                    self.icons.draw(ctx, ui, Icon::Search, 20.0);
                     ui.add_sized(
                         [340.0, 28.0],
                         egui::TextEdit::singleline(&mut self.song_bank_search)
@@ -2530,8 +2627,16 @@ impl GrancoPlannerApp {
                                 .show(ui, |ui| {
                                     ui.vertical(|ui| {
                                         ui.horizontal(|ui| {
-                                            let toggle_icon = if is_expanded { "▾" } else { "▸" };
-                                            if ui.small_button(toggle_icon).clicked() {
+                                            let toggle_icon = if is_expanded {
+                                                Icon::DropDown
+                                            } else {
+                                                Icon::ArrowRight
+                                            };
+                                            if self
+                                                .icons
+                                                .icon_only_button(ctx, ui, toggle_icon, 22.0, true)
+                                                .clicked()
+                                            {
                                                 if is_expanded {
                                                     self.expanded_songs.remove(&song.id);
                                                 } else {
@@ -2575,22 +2680,30 @@ impl GrancoPlannerApp {
                                             ui.with_layout(
                                                 Layout::right_to_left(Align::Center),
                                                 |ui| {
-                                                    if ui
-                                                        .add(
-                                                            egui::Button::new(
-                                                                RichText::new("🗑").color(
-                                                                    Color32::from_rgb(239, 68, 68),
-                                                                ),
-                                                            )
-                                                            .small(),
+                                                    if self
+                                                        .icons
+                                                        .icon_only_button(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::Delete,
+                                                            24.0,
+                                                            true,
                                                         )
                                                         .on_hover_text(i18n.t("delete"))
                                                         .clicked()
                                                     {
                                                         del_song_id = Some(song.id.clone());
                                                     }
-                                                    if ui
-                                                        .small_button("➕ Arr.")
+                                                    if self
+                                                        .icons
+                                                        .button(
+                                                            ctx,
+                                                            ui,
+                                                            Icon::Add,
+                                                            "Arr.",
+                                                            false,
+                                                            Vec2::new(72.0, 26.0),
+                                                        )
                                                         .on_hover_text(i18n.t("addArrangement"))
                                                         .clicked()
                                                     {
@@ -2660,8 +2773,15 @@ impl GrancoPlannerApp {
                                                                         Align::Center,
                                                                     ),
                                                                     |ui| {
-                                                                        if ui
-                                                                            .small_button("🗑")
+                                                                        if self
+                                                                            .icons
+                                                                            .icon_only_button(
+                                                                                ctx,
+                                                                                ui,
+                                                                                Icon::Delete,
+                                                                                20.0,
+                                                                                true,
+                                                                            )
                                                                             .clicked()
                                                                         {
                                                                             del_arr = Some((
@@ -2872,7 +2992,7 @@ impl GrancoPlannerApp {
 
                 ui.add_space(20.0);
 
-                // KPI Cards
+                // KPI Cards with Streamline Plump Color Icons
                 let card_bg = if is_dark {
                     Color32::from_rgb(28, 28, 33)
                 } else {
@@ -2889,22 +3009,30 @@ impl GrancoPlannerApp {
                     ui.horizontal_wrapped(|ui| {
                         let kpis = [
                             (
-                                "📅",
+                                Icon::Services,
                                 i18n.t("totalServicesScheduled"),
                                 format!("{}", active_service_dates.len()),
                             ),
                             (
-                                "🎵",
+                                Icon::Song,
                                 i18n.t("totalSongInstances"),
                                 format!("{}", total_scheduled_songs),
                             ),
                             (
-                                "📊",
+                                Icon::Analytics,
                                 i18n.t("uniqueSongsUsed"),
                                 format!("{}", unique_used),
                             ),
-                            ("🏆", i18n.t("mostFrequentSong"), top_song_str.clone()),
-                            ("🎹", i18n.t("mostFrequentKey"), top_key_str.clone()),
+                            (
+                                Icon::StarMedal,
+                                i18n.t("mostFrequentSong"),
+                                top_song_str.clone(),
+                            ),
+                            (
+                                Icon::Keyboard,
+                                i18n.t("mostFrequentKey"),
+                                top_key_str.clone(),
+                            ),
                         ];
 
                         for (icon, label, val) in kpis {
@@ -2916,8 +3044,12 @@ impl GrancoPlannerApp {
                                 .show(ui, |ui| {
                                     ui.set_min_size(Vec2::new(175.0, 68.0));
                                     ui.vertical(|ui| {
-                                        ui.label(
-                                            RichText::new(format!("{}  {}", icon, label))
+                                        self.icons.label_with_icon(
+                                            ctx,
+                                            ui,
+                                            icon,
+                                            18.0,
+                                            RichText::new(label)
                                                 .size(12.5)
                                                 .color(Color32::GRAY)
                                                 .strong(),
@@ -2938,7 +3070,7 @@ impl GrancoPlannerApp {
                 ui.add_space(20.0);
                 ui.horizontal(|ui| {
                     ui.add_space(24.0);
-                    ui.label("🔍");
+                    self.icons.draw(ctx, ui, Icon::Search, 20.0);
                     ui.add_sized(
                         [340.0, 28.0],
                         egui::TextEdit::singleline(&mut self.analytics_search)
@@ -2975,7 +3107,10 @@ impl GrancoPlannerApp {
                                     ui.add_sized(
                                         [40.0, 18.0],
                                         egui::Label::new(
-                                            RichText::new("#").size(11.0).strong().color(Color32::GRAY),
+                                            RichText::new("#")
+                                                .size(11.0)
+                                                .strong()
+                                                .color(Color32::GRAY),
                                         ),
                                     );
                                     ui.add_sized(
@@ -3106,9 +3241,13 @@ impl GrancoPlannerApp {
                         // Least Played / Inactive Songs Table
                         if !least_played.is_empty() {
                             ui.add_space(24.0);
-                            ui.label(
+                            self.icons.label_with_icon(
+                                ctx,
+                                ui,
+                                Icon::Hourglass,
+                                20.0,
                                 RichText::new(format!(
-                                    "⏳ {} ({})",
+                                    "{} ({})",
                                     i18n.t("leastPlayedTitle"),
                                     least_played.len()
                                 ))
@@ -3197,8 +3336,12 @@ impl GrancoPlannerApp {
                             .inner_margin(Margin::symmetric(20, 18))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.label(
-                                    RichText::new(format!("🎨  {}", i18n.t("appearance")))
+                                self.icons.label_with_icon(
+                                    ctx,
+                                    ui,
+                                    Icon::PaintPalette,
+                                    22.0,
+                                    RichText::new(i18n.t("appearance"))
                                         .size(18.0)
                                         .strong(),
                                 );
@@ -3211,20 +3354,24 @@ impl GrancoPlannerApp {
 
                                 ui.horizontal_wrapped(|ui| {
                                     let themes = [
-                                        (ThemeMode::Dark, "🌙", i18n.t("darkTheme")),
-                                        (ThemeMode::Light, "☀", i18n.t("lightTheme")),
-                                        (ThemeMode::System, "🖥", i18n.t("systemTheme")),
+                                        (ThemeMode::Dark, Icon::MoonStars, i18n.t("darkTheme")),
+                                        (ThemeMode::Light, Icon::Sun, i18n.t("lightTheme")),
+                                        (
+                                            ThemeMode::System,
+                                            Icon::ComputerDesktop,
+                                            i18n.t("systemTheme"),
+                                        ),
                                     ];
                                     for (mode, icon, label) in themes {
                                         let active = self.settings.theme_mode == mode;
-                                        let btn = egui::Button::new(
-                                            RichText::new(format!("{}  {}", icon, label))
-                                                .size(14.0)
-                                                .strong(),
-                                        )
-                                        .selected(active)
-                                        .min_size(Vec2::new(200.0, 44.0));
-                                        if ui.add(btn).clicked() {
+                                        if self.icons.selectable_button(
+                                            ctx,
+                                            ui,
+                                            icon,
+                                            label,
+                                            active,
+                                            Vec2::new(200.0, 44.0),
+                                        ) {
                                             self.settings.theme_mode = mode;
                                             let _ = self.db.save_settings(&self.settings);
                                             self.apply_theme(ctx);
@@ -3243,8 +3390,12 @@ impl GrancoPlannerApp {
                             .inner_margin(Margin::symmetric(20, 18))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.label(
-                                    RichText::new(format!("🌐  {}", i18n.t("language")))
+                                self.icons.label_with_icon(
+                                    ctx,
+                                    ui,
+                                    Icon::Earth,
+                                    22.0,
+                                    RichText::new(i18n.t("language"))
                                         .size(18.0)
                                         .strong(),
                                 );
@@ -3257,17 +3408,19 @@ impl GrancoPlannerApp {
 
                                 ui.horizontal_wrapped(|ui| {
                                     let langs = [
-                                        (Language::Es, "🇪🇸  Español (Latinoamérica)"),
-                                        (Language::En, "🇺🇸  English (United States)"),
+                                        (Language::Es, "Español (Latinoamérica)"),
+                                        (Language::En, "English (United States)"),
                                     ];
                                     for (lang, label) in langs {
                                         let active = self.settings.language == lang;
-                                        let btn = egui::Button::new(
-                                            RichText::new(label).size(14.0).strong(),
-                                        )
-                                        .selected(active)
-                                        .min_size(Vec2::new(240.0, 44.0));
-                                        if ui.add(btn).clicked() {
+                                        if self.icons.selectable_button(
+                                            ctx,
+                                            ui,
+                                            Icon::Earth,
+                                            label,
+                                            active,
+                                            Vec2::new(240.0, 44.0),
+                                        ) {
                                             self.settings.language = lang;
                                             let _ = self.db.save_settings(&self.settings);
                                         }
@@ -3325,8 +3478,16 @@ impl GrancoPlannerApp {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(i18n.t("sermonSeries")).strong());
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui
-                                    .small_button(format!("➕ {}", i18n.t("createNewSeries")))
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::Add,
+                                        i18n.t("createNewSeries"),
+                                        false,
+                                        Vec2::new(140.0, 26.0),
+                                    )
                                     .clicked()
                                 {
                                     self.service_form.creating_new_series = true;
@@ -3376,7 +3537,18 @@ impl GrancoPlannerApp {
                             ui.label(i18n.t("seriesTitle"));
                             ui.text_edit_singleline(&mut self.service_form.new_series_title);
                             ui.horizontal(|ui| {
-                                if ui.button(format!("🖼 {}", i18n.t("dropzoneText"))).clicked() {
+                                if self
+                                    .icons
+                                    .button(
+                                        ctx,
+                                        ui,
+                                        Icon::LandscapeView,
+                                        i18n.t("dropzoneText"),
+                                        false,
+                                        Vec2::new(180.0, 30.0),
+                                    )
+                                    .clicked()
+                                {
                                     if let Some(path) = rfd::FileDialog::new()
                                         .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
                                         .pick_file()
@@ -3386,11 +3558,19 @@ impl GrancoPlannerApp {
                                     }
                                 }
                                 if self.service_form.new_series_artwork.is_some() {
-                                    ui.label(
-                                        RichText::new("✔ Image Loaded")
+                                    self.icons.label_with_icon(
+                                        ctx,
+                                        ui,
+                                        Icon::Check,
+                                        16.0,
+                                        RichText::new("Image Loaded")
                                             .color(Color32::from_rgb(34, 197, 94)),
                                     );
-                                    if ui.small_button("🗑").clicked() {
+                                    if self
+                                        .icons
+                                        .icon_only_button(ctx, ui, Icon::Delete, 22.0, true)
+                                        .clicked()
+                                    {
                                         self.service_form.new_series_artwork = None;
                                     }
                                 }
@@ -3491,7 +3671,18 @@ impl GrancoPlannerApp {
                     ui.add_space(8.0);
                     ui.label(RichText::new(i18n.t("seriesArtworkGraphic")).strong());
                     ui.horizontal(|ui| {
-                        if ui.button(format!("🖼  {}", i18n.t("dropzoneText"))).clicked() {
+                        if self
+                            .icons
+                            .button(
+                                ctx,
+                                ui,
+                                Icon::LandscapeView,
+                                i18n.t("dropzoneText"),
+                                false,
+                                Vec2::new(190.0, 32.0),
+                            )
+                            .clicked()
+                        {
                             if let Some(path) = rfd::FileDialog::new()
                                 .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
                                 .pick_file()
@@ -3500,11 +3691,19 @@ impl GrancoPlannerApp {
                             }
                         }
                         if self.series_form.artwork.is_some() {
-                            ui.label(
-                                RichText::new("✔ Artwork attached")
+                            self.icons.label_with_icon(
+                                ctx,
+                                ui,
+                                Icon::Check,
+                                16.0,
+                                RichText::new("Artwork attached")
                                     .color(Color32::from_rgb(34, 197, 94)),
                             );
-                            if ui.small_button("🗑").clicked() {
+                            if self
+                                .icons
+                                .icon_only_button(ctx, ui, Icon::Delete, 22.0, true)
+                                .clicked()
+                            {
                                 self.series_form.artwork = None;
                             }
                         }
@@ -3594,7 +3793,7 @@ impl GrancoPlannerApp {
                                 for song in matching {
                                     let default_arr = song.arrangements.first().cloned();
                                     let btn_txt = format!(
-                                        "🎵 {} — {} ({})",
+                                        "{} — {} ({})",
                                         song.title,
                                         if song.artist.is_empty() {
                                             "—"
@@ -3606,8 +3805,16 @@ impl GrancoPlannerApp {
                                             .map(|a| a.key.as_str())
                                             .unwrap_or("C")
                                     );
-                                    if ui
-                                        .add_sized([430.0, 32.0], egui::Button::new(btn_txt))
+                                    if self
+                                        .icons
+                                        .button(
+                                            ctx,
+                                            ui,
+                                            Icon::Song,
+                                            &btn_txt,
+                                            false,
+                                            Vec2::new(430.0, 32.0),
+                                        )
                                         .clicked()
                                     {
                                         self.add_item_form.selected_song_id = song.id.clone();
@@ -4075,8 +4282,12 @@ impl eframe::App for GrancoPlannerApp {
                     .resizable(false)
                     .anchor(egui::Align2::RIGHT_BOTTOM, Vec2::new(-20.0, -20.0))
                     .show(ctx, |ui| {
-                        ui.label(
-                            RichText::new(format!("✔ {}", msg))
+                        self.icons.label_with_icon(
+                            ctx,
+                            ui,
+                            Icon::Check,
+                            18.0,
+                            RichText::new(msg)
                                 .color(Color32::from_rgb(34, 197, 94))
                                 .strong(),
                         );

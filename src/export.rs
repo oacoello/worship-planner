@@ -1,4 +1,5 @@
 use crate::i18n::I18n;
+use crate::icons::Icon;
 use crate::models::{ItemType, ServiceItem, ServicePlan};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chrono::{Duration, NaiveTime};
@@ -102,8 +103,8 @@ pub fn extract_ambient_tint(artwork_b64: Option<&str>, is_dark: bool) -> Color32
     }
 }
 
-/// Generates a monochrome 1-ink print-ready HTML Run Sheet matching the original CSS print layout
-/// and opens it in the user's system browser with automatic print dialog trigger.
+/// Generates a print-ready HTML Run Sheet matching the original CSS print layout
+/// with Streamline Plump Color icons and opens it in the user's system browser.
 pub fn generate_printable_html(
     service: &ServicePlan,
     items: &[ServiceItem],
@@ -171,7 +172,7 @@ pub fn generate_printable_html(
                 </div>
             </div>"#,
             duration = item.format_duration(),
-            icon = item.item_type.icon_symbol(),
+            icon = item.item_type.icon().svg_str(),
             title = html_escape(&item.title),
             key_badge = key_badge,
             notes = if item.notes.is_empty() {
@@ -244,6 +245,17 @@ pub fn generate_printable_html(
     margin-top: 8px;
     display: flex;
     gap: 24px;
+    align-items: center;
+  }}
+  .setlist-meta span {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }}
+  .setlist-meta svg, .no-print-bar button svg {{
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
   }}
   .print-only-logo {{
     height: 70px;
@@ -281,9 +293,13 @@ pub fn generate_printable_html(
     font-size: 11.5pt;
   }}
   .setlist-type-icon {{
-    text-align: center;
-    font-size: 13pt;
-    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }}
+  .setlist-type-icon svg {{
+    width: 22px;
+    height: 22px;
   }}
   .setlist-title-col > div {{
     display: flex;
@@ -320,7 +336,7 @@ pub fn generate_printable_html(
 </head>
 <body onload="setTimeout(() => window.print(), 250)">
   <div class="no-print-bar" style="max-width:960px;margin:0 auto 12px;display:flex;justify-content:flex-end;">
-    <button onclick="window.print()" style="padding:8px 16px;font-weight:700;cursor:pointer;">🖨 {print_label}</button>
+    <button onclick="window.print()" style="padding:8px 16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">{print_svg} {print_label}</button>
   </div>
   <div class="setlist-sheet">
     <div class="setlist-banner">
@@ -328,9 +344,9 @@ pub fn generate_printable_html(
         <h1 class="setlist-title">{title}</h1>
         {details_block}
         <div class="setlist-meta">
-          <span>📅 {long_date}</span>
-          <span>🕒 {start_label}: <strong>{start_time}</strong></span>
-          <span>⏱ {total_label}: <strong>{total_formatted}</strong> ({est_end_label}: {end_time})</span>
+          <span>{cal_svg} {long_date}</span>
+          <span>{clock_svg} {start_label}: <strong>{start_time}</strong></span>
+          <span>{timer_svg} {total_label}: <strong>{total_formatted}</strong> ({est_end_label}: {end_time})</span>
         </div>
       </div>
       <div>
@@ -353,15 +369,19 @@ pub fn generate_printable_html(
         lang = i18n.lang.as_code(),
         title = html_escape(&service.title),
         date = html_escape(&service.date),
+        print_svg = Icon::Print.svg_str(),
         print_label = html_escape(i18n.t("printRunSheet")),
         details_block = if sermon_details.is_empty() {
             String::new()
         } else {
             format!(r#"<div class="setlist-details">{}</div>"#, sermon_details)
         },
+        cal_svg = Icon::CalendarCheck.svg_str(),
         long_date = html_escape(&i18n.format_long_date(&service.date)),
+        clock_svg = Icon::Clock.svg_str(),
         start_label = html_escape(i18n.t("start")),
         start_time = I18n::format_naive_time_12h(start_time),
+        timer_svg = Icon::Countdown.svg_str(),
         total_label = html_escape(i18n.t("total")),
         total_formatted = total_formatted,
         est_end_label = html_escape(i18n.t("estEnd")),

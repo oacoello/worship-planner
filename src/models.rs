@@ -166,14 +166,14 @@ impl ItemType {
         }
     }
 
-    pub fn icon_symbol(&self) -> &'static str {
+    pub fn icon(&self) -> crate::icons::Icon {
         match self {
-            ItemType::Song => "♪",
-            ItemType::Conference => "🎤",
-            ItemType::Video => "▶",
-            ItemType::Loop => "↻",
-            ItemType::Announcements => "📢",
-            ItemType::Countdown => "⏱",
+            ItemType::Song => crate::icons::Icon::Song,
+            ItemType::Conference => crate::icons::Icon::Conference,
+            ItemType::Video => crate::icons::Icon::Video,
+            ItemType::Loop => crate::icons::Icon::Loop,
+            ItemType::Announcements => crate::icons::Icon::Announcements,
+            ItemType::Countdown => crate::icons::Icon::Countdown,
         }
     }
 }

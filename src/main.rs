@@ -4,6 +4,7 @@ mod app;
 mod db;
 mod export;
 mod i18n;
+mod icons;
 mod models;
 
 use app::GrancoPlannerApp;
